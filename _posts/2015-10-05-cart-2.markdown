@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Más de CART'
+categories: clase
+---
+
+[Material]( https://www.dropbox.com/s/5j5mm9uy8sr2rx3/clase_14.zip?dl=1 ), [Notas](https://www.dropbox.com/s/r8achq5jucirgli/Notas_AE_14.pdf?dl=1)
