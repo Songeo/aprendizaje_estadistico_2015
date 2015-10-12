@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  'Clase 15: Bagging y Bosques aleatorios'
+title:  'Clase 16: Bagging y Bosques aleatorios'
 categories: clase
 ---
 
