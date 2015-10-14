@@ -41,3 +41,8 @@ El Aprendizaje Estadístico trata de cómo aprender de conjuntos de datos: cómo
 - [Google Developers R Programming](http://www.youtube.com/watch?v=iffR3fWv4xw&list=PLOU2XLYxmsIK9qQfztXeybpHvru-TrqAP) Introducción a los fundamentos de programación en R.
 - Para hacer reportes: [R Markdown — Dynamic Documents for R](http://rmarkdown.rstudio.com)  Cómo hacer reportes simples desde Rstudio.
 
+### Otras referencias
+
+- [50 years of Data Science](https://dl.dropboxusercontent.com/u/23421017/50YearsDataScience.pdf)
+-[Statistical Modeling: the two cultures](https://projecteuclid.org/euclid.ss/1009213726)
+- [Do we NeedHundreds of Classifiers to Solve Real World Classification Problems?](http://jmlr.org/papers/v15/delgado14a.html)
