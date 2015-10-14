@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Clase 17: Bosques aleatorios'
+categories: clase
+---
+
+[Material](https://www.dropbox.com/s/t10ukiv3vvx63bv/clase_17.zip?dl=1 ), [Notas](https://www.dropbox.com/s/yg8pax0a2tnqak1/Notas_AE_17.pdf?dl=1)
