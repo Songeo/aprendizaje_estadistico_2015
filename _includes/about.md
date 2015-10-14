@@ -44,5 +44,5 @@ El Aprendizaje Estadístico trata de cómo aprender de conjuntos de datos: cómo
 ### Otras referencias
 
 - [50 years of Data Science](https://dl.dropboxusercontent.com/u/23421017/50YearsDataScience.pdf)
--[Statistical Modeling: the two cultures](https://projecteuclid.org/euclid.ss/1009213726)
+- [Statistical Modeling: the two cultures](https://projecteuclid.org/euclid.ss/1009213726)
 - [Do we NeedHundreds of Classifiers to Solve Real World Classification Problems?](http://jmlr.org/papers/v15/delgado14a.html)
