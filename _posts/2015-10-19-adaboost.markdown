@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Clase 18: Boosting, adaboost, FS additive modelling'
+categories: clase
+---
+
+[Material]( https://www.dropbox.com/s/x9ef1y7kyxzqb92/clase_18.zip?dl=1), [Notas](https://www.dropbox.com/s/56xlansibq6a3v0/Notas_AE_18.pdf?dl=1)
