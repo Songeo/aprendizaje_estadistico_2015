@@ -1,0 +1,338 @@
+---
+title: "Gradient boosting 1"
+author: "Felipe González"
+date: Otoño 2015
+output: 
+  html_document: 
+    theme: united
+---
+
+
+1. Ajustando parámetros para gradient boosting
+----
+
+Es más difícil obtener buen desempeño de boosting pues hay varios parámetros por afinar, aunque
+es posible hacerlo con un poco de trabajo. Hay que ajustar cuatro parámetros:
+
+ - Tamaño de árboles (también se llama profundidad de interacción)
+ - Regularización (shrinkage): qué tanto modificamos el clasificador anterior con el nuevo árbol
+ - Submuestreo: qué tamaño de muestra tomamos para construir cada árbol.
+ - Número de árboles (iteraciones).
+ 
+ 
+Consideramos un ejemplo simulado con una frontera de decisión no lineal:
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+sim_datos <- function(n, p){
+    dat.x <- data.frame(matrix(rnorm(n*p, 0, 1), ncol=p))
+    p.y <-    ifelse(apply(dat.x, 1, function(x){sum(x^2)})>9, 0.95, 0.05)
+    y <- rbinom(length(p.y), 1, prob = p.y)
+    data.frame(dat.x, y)
+}
+set.seed(2008)
+entrena <- sim_datos(2000, 10)
+prueba <-  sim_datos(10000, 10)
+datos <- rbind(entrena, prueba)
+```
+
+En nuestro primer intento construimos un predictor con boosting con 
+2 cortes, 90% de bag fraction y encogimiento de 0.5:
+
+```{r}
+library(gbm)
+mod.ejemplo <- gbm(y~., 
+    distribution = 'bernoulli',
+    data = entrena, 
+    n.trees = 10000,
+    interaction.depth = 2,
+    shrinkage = 0.01,
+    bag.fraction=0.9, 
+    train.fraction=2000/12000,
+    verbose = T)
+error <- data.frame(train.error = mod.ejemplo$train.error, 
+                    valid.error = mod.ejemplo$valid.error,
+                    iter.num = 1:length(mod.ejemplo$train.error)) %>%
+        gather(error, valor, train.error:valid.error)
+ggplot(error, aes(x = iter.num, y=valor, colour = error, group=error)) +
+    geom_line()
+```
+
+Donde vemos que  sobreajustamos
+cuando seguimos añadiendo árboles. Veamos qué pasa cuando afinamos
+parámetros:
+
+```{r}
+ajustar_mod <- function(entrena, shrinkage, bag.fraction =0.9, interaction.depth=3,n.trees=500){
+    mod.out <- gbm(y~., 
+        distribution = 'bernoulli',
+        data = entrena, 
+        n.trees = n.trees,
+        interaction.depth = interaction.depth,
+        shrinkage = shrinkage,
+        bag.fraction= bag.fraction, 
+        train.fraction=2000/12000)
+    error <- data.frame(train.error = mod.out$train.error, 
+                    valid.error = mod.out$valid.error,
+                    iter.num = 1:length(mod.out$train.error)) %>%
+            gather(error, valor, train.error:valid.error)    
+    print(shrinkage)
+    error$shrinkage <- shrinkage
+    
+    error$bag.fraction  <- bag.fraction
+    error$interaction.depth <- interaction.depth
+    error
+}
+
+```
+
+Ahora corremos con distintos valores:
+```{r, cache=T}
+params <- expand.grid(list(shrinkage=c( 0.02, 0.05, 0.10, 0.15,0.2), 
+                            bag.fraction=c(0.2,0.5,0.9),
+                            interaction.depth=c(1,4,8), n.trees = 2000))
+params$id <- 1:nrow(params)
+res_error <- do(params  %>% group_by(id), 
+   ajustar_mod(entrena = entrena, shrinkage=.$shrinkage, 
+                   bag.fraction=.$bag.fraction, 
+                   interaction.depth=.$interaction.depth, 
+                   n.trees=.$n.trees))
+head(res_error)
+ggplot(filter(res_error, error=='valid.error'), 
+    aes(x=iter.num, y=valor, colour=factor(shrinkage), group=shrinkage)) +
+    geom_line() + facet_grid(interaction.depth~bag.fraction)  +
+    geom_hline(yintercept=1, alpha=0.6) + scale_y_log10()
+min(res_error$valor[res_error$error=='valid.error'])
+```
+
+```{r, cache=T}
+params <- expand.grid(list(shrinkage=c(0.001,0.005, 0.01, 0.02, 0.05), 
+                            bag.fraction=c(0.5,0.7,0.9),
+                            interaction.depth=c(1,2,4), n.trees = 20000))
+params$id <- 1:nrow(params)
+system.time(res_error <- do(params  %>% group_by(id), 
+   ajustar_mod(entrena = entrena, shrinkage=.$shrinkage, 
+                   bag.fraction=.$bag.fraction, 
+                   interaction.depth=.$interaction.depth, 
+                   n.trees=.$n.trees)))
+head(res_error)
+
+ggplot(filter(res_error, error=='valid.error'), 
+    aes(x=iter.num, y=valor, colour=factor(shrinkage), group=shrinkage)) +
+    geom_line() + facet_grid(interaction.depth~bag.fraction)  +
+    geom_hline(yintercept=1, alpha=0.6) + scale_y_log10()
+
+min(res_error$valor[res_error$error=='valid.error'])
+
+
+```
+
+Algunas observaciones:
+
+- Cuando hacemos el encogimiento más chico, típicamente tenemos que correr más iteraciones
+(número de árboles).
+- Valores altos de encogimiento a veces funcionan bien, pero pueden producir sobreajuste
+rápidamente. 
+- Las iteraciones son más rápidas cuando bag.fraction es más chico (trabajamos con muestras chicas). 
+- Usualmente funcionan mejor valores relativamente bajos de profundidad de árboles (1,2 a 10).
+El algoritmo también es más rápido para árboles más chicos.
+
+Ajustamos un modelo final y estimamos tasa de incorrectos:
+```{r}
+mod_final <- gbm(y~., 
+    distribution = 'bernoulli',
+    data = entrena, 
+    n.trees = 1000,
+    interaction.depth = 1,
+    shrinkage = 0.05,
+    bag.fraction=0.5, 
+    train.fraction=2000/12000,
+    verbose = T)
+pred_clase <- as.numeric(predict(mod_final, newdata = prueba, n.trees=650)>0)
+mean(pred_clase !=prueba$y)
+```
+
+2. Ejemplo
+----
+
+```{r}
+# si encuentras un error aquí instala los paquetes con:
+#install.packages(c('maptools','maps'))
+rm(list=ls()) # borrar todos los objetos del inciso anterior
+library(maptools)
+library(maps)
+library(gbm)
+```
+
+&P Letters Data
+We collected information on the variables using all the block groups in California from the 1990 Census. In this sample a block group on average includes 1425.5 individuals living in a geographically compact area. Naturally, the geographical area included varies inversely with the population density. We computed distances among the centroids of each block group as measured in latitude and longitude. We excluded all the block groups reporting zero entries for the independent and dependent variables. The final data contained 20,640 observations on 9 variables. The dependent variable is ln(median house value).
+
+INTERCEPT	
+MEDIAN INCOME	
+MEDIAN INCOME2	
+MEDIAN INCOME3	
+ln(MEDIAN AGE)	
+ln(TOTAL ROOMS/ POPULATION)	
+ln(BEDROOMS/ POPULATION)	
+ln(POPULATION/ HOUSEHOLDS)	
+ln(HOUSEHOLDS)		
+
+The file cadata.txt contains all the the variables. Specifically, it contains median house value, median income, housing median age, total rooms, total bedrooms, population, households, latitude, and longitude in that order. 
+
+Reference
+
+Pace, R. Kelley and Ronald Barry, Sparse Spatial Autoregressions, Statistics and Probability Letters, 33 (1997) 291-297.
+
+
+Popdemos ver la ubicación de los block groups:
+
+```{r}
+data <- read.table("datos/cadata.txt", skip=27, sep="",
+    strip.white=TRUE)
+nrow(data)
+names(data) <- c("med.value","med.income","housing.med.age",
+    "total.rooms","total.bedrooms",
+    "pop","households","lat","long")
+
+map('county','california')
+points(data$long, data$lat,cex=0.2)           
+```
+
+```{r}
+data$ave.room <- data$total.rooms/data$households
+data$ave.bedroom <- data$total.bedrooms/data$households
+data$med.value.scaled <- data$med.value/100000
+data$ave.occupancy <- data$pop/data$households 
+#ojo: gbm usa el orden de los datos
+set.seed(122323)
+data.f <- data[sample(1:nrow(data), nrow(data)),]
+data.f.test <- data.f[1:4000,]
+data.f.train <- data.f[4000:20640, ]
+
+```
+
+En este caso, seleccionamos modelos con validación cruzada (nota: si tu computadora tiene 4 o 8 cores ajusta este valor en n.cores para que la
+validación cruzada se haga en paralelo).
+
+```{r}
+gbm.2 <- function(n.trees, shrinkage, interaction.depth, bag.fraction,cv.folds){
+    fit.boost <- gbm((med.value.scaled) ~ med.income + 
+            households + 
+            lat + long + ave.room + 
+            ave.bedroom + housing.med.age +
+            ave.occupancy,
+            data=data.f.train,
+            n.trees=n.trees,
+            distribution="laplace",
+            shrinkage=shrinkage,
+            interaction.depth = interaction.depth,
+            bag.fraction = bag.fraction,
+            train.fraction=1,
+            n.minobsinnode = 10,
+            cv.folds=cv.folds,
+            keep.data=FALSE,
+            verbose=FALSE,
+            n.cores=1
+            )
+    fit.boost
+    }
+```
+
+
+```{r, cache=T}
+mod.1 <- gbm.2(n.trees=800, shrinkage=0.07, interaction.depth=6, bag.fraction=0.5, cv.folds=10)
+mod.2 <- gbm.2(n.trees=800, shrinkage=0.40, interaction.depth=6, bag.fraction=0.5, cv.folds=10) 
+#mod.22 <- gbm.2(n.trees=800, shrinkage=1, interaction.depth=6, bag.fraction=0.9)  
+
+mod.3 <- gbm.2(n.trees=800, shrinkage=0.07, interaction.depth=2, bag.fraction=0.5, cv.folds=10) 
+#mod.4 <- gbm.2(n.trees=800, shrinkage=0.07, interaction.depth=6, bag.fraction=0.2)
+#mod.5 <- gbm.2(n.trees=800, shrinkage=0.05, interaction.depth=6, bag.fraction=0.5)
+```
+
+```{r}
+plot(mod.1$cv.error[-c(1:10)], type="l")
+lines(mod.2$cv.error[-c(1:10)], col="red")
+#lines(mod.22$cv.error[-c(1:10)], col="gray")
+lines(mod.3$cv.error[-c(1:10)],col="blue")
+#lines(mod.4$cv.error[-c(1:10)], col="green")
+#lines(mod.5$cv.error[-c(1:10)], col="purple")
+```
+
+
+```{r, cache=TRUE}
+
+mod.final <- mod.1
+  
+  #gbm.2(n.trees=800, shrinkage=0.05, interaction.depth=6, bag.fraction=0.5, cv.folds=10)
+
+plot(mod.final$cv.error, type="l", col="red")
+
+```
+
+Calculamos con la muestra de prueba nuestra estimación final del error de predicción:
+
+```{r}
+pred.test <- predict(mod.final, data.f.test, n.trees=2500)
+mean(abs(pred.test-data.f.test$med.value.scaled))
+plot(data.f.test$med.value.scaled, pred.test)
+#Errores en dólares:
+round(100000*quantile(sort(abs(pred.test-data.f.test$med.value.scaled)), probs=seq(0,1,0.1)),2)
+#Extraemos el mejor número de árboles
+best.iter.test <- gbm.perf(mod.final,method="cv")
+print(best.iter.test) 
+```
+
+Podemos ver las importancias de Gini (como porcentaje, escaladas para que sumen 100)
+
+```{r}
+#Resumen e importancias con el mejor número de iteraciones
+summary(mod.final,n.trees=best.iter.test) 
+```
+
+3. Gráficas de dependencia parcial
+---
+
+Estas gráficas ayudan a entender el efecto de las entradas:
+
+```{r}
+
+
+plot(mod.final, i.var=1)
+rug(quantile(data.f.test$med.income, probs=seq(0,1,0.1)))
+
+plot(mod.final, i.var=2) 
+rug(quantile(data.f.test$households, probs=seq(0,1,0.1)))
+hist(data.f$households, breaks=1000)
+
+##Volvemos a hacer con un rango más razonable
+plot(mod.final, i.var=2, xlim=c(0,1000)) 
+rug(quantile(data.f.test$households, probs=seq(0,1,0.1)))
+
+
+# Latitud y longitud sólo tienen sentido como interacción
+plot(mod.final, i.var=c(4,3))
+```
+
+Podemos hacer un mapa para entender esta relación:
+
+```{r, fig.width=5, fig.height=6}
+
+grid.pos <- plot(mod.final, i.var=c(4,3), n.trees=1000, return.grid=TRUE)
+
+library(kknn)
+
+
+#map('county','california', add=TRUE)
+knn.1 <- kknn(y~long+lat, grid.pos, data.f.train[ , c("long","lat")], k=1,
+    kernel="rectangular")
+data.f.train$lat.long.partial <- knn.1$fitted.values
+data.f.train$lat.long.partial.cat <- 
+  cut(data.f.train$lat.long.partial, breaks=quantile(data.f.train$lat.long.partial, seq(0,1,0.1)), include.lowest=T)
+plot(data.f.train$long, data.f.train$lat,
+     col=rev(heat.colors(10, alpha=0.8))[data.f.train$lat.long.partial.cat], pch=16,
+        cex=0.8)
+map('county','california', add=TRUE, col="gray80")
+
+```
