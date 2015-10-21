@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Clase 19: gradient boosting'
+categories: clase
+---
+
+[Material]( https://www.dropbox.com/s/orsfnalysouih4i/clase_19.zip?dl=1), [Notas](https://www.dropbox.com/s/cyclgjg7jsv2pey/Notas_AE_19.pdf?dl=1)
