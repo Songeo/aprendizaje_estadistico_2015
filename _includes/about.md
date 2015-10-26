@@ -46,3 +46,11 @@ El Aprendizaje Estadístico trata de cómo aprender de conjuntos de datos: cómo
 - [50 years of Data Science](https://dl.dropboxusercontent.com/u/23421017/50YearsDataScience.pdf)
 - [Statistical Modeling: the two cultures](https://projecteuclid.org/euclid.ss/1009213726)
 - [Do we NeedHundreds of Classifiers to Solve Real World Classification Problems?](http://jmlr.org/papers/v15/delgado14a.html)
+
+### Concursos
+
+Estos concursos serán parte del segundo parcial. Los equipos deben ser de 3 o menos personas. El mínimo requerido es superar el benchmark más alto en el leaderboard de cada concurso.
+
+- [Motion prediction in home automation](https://inclass.kaggle.com/c/motion-prediction-in-home-automation).
+- [Image based door sensor](https://inclass.kaggle.com/c/image-based-door-sensor)
+
