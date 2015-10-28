@@ -1,0 +1,170 @@
+---
+title: "Redes neuronales: introducción 2"
+author: "Felipe González"
+date: Otoño 2015
+output: 
+  html_document: 
+    theme: united
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(readr)
+#if(!('neuralnet' %in% installed.packages()[,"Package"])){
+  #install.packages('neuralnet')  
+#}
+#library(neuralnet)
+library(RSNNS)
+library(ElemStatLearn)
+```
+
+```{r}
+zip_total <- rbind(zip.train, zip.test)
+set.seed(2991)
+zip_total <- zip_total[sample(1:nrow(zip_total), nrow(zip_total)),]
+zip_train <- zip_total[1:4000, ]
+zip_test <- zip_total[4001:6000, ]
+nrow(zip_train)
+nrow(zip_test)
+```
+
+```{r}
+x_train <- as.matrix(zip_train[,-1])
+x_test <- as.matrix(zip_test[,-1])
+targets_train <- decodeClassLabels(zip_train[,1])
+targets_test <- decodeClassLabels(zip_test[,1])
+head(targets_train)
+```
+
+Estandarizamos las entradas:
+```{r}
+x_train_s <- scale(x_train)
+x_test_s <- scale(x_test, center = attr(x_train_s, 'scaled:center'), scale = attr(x_train_s, 'scaled:scale'))
+```
+
+
+
+Comenzamos con una corrida simple con una red chica (1 capa oculta, 8 unidades). 
+Ajustamos con backprop regularizado. En la línea
+
+```{r}
+learnFuncParams = c(0.5, 0.001, 0, 0)
+```
+
+el primer parámetro es la tasa de aprendizaje (descenso del algoritmo): queremos que sea grande para avanzar rápido hacia el mínimo, pero no tanto que saltemos a valores peores del objetivo. El segundo parámetro es la $\lambda$ de regularización, y los últimos dos no los usamos (ver [documentación de SNSS](http://www.ra.cs.uni-tuebingen.de/SNNS/UserManual/node1.html) ).
+
+```{r, cache=T}
+set.seed(28057)
+model_1 <- mlp(x=x_train_s, targets_train, 
+             size=c(8), 
+             learnFunc = 'BackpropWeightDecay',
+             learnFuncParams = c(0.2, 0.001, 0, 0), 
+             maxit = 20,
+             inputsTest = x_test_s, targetsTest = targets_test)
+preds <- predict(model_1, x_test_s)
+confusionMatrix(targets_test, preds)
+error <- 1 - sum(diag(confusionMatrix(targets_test, preds)))/nrow(zip_test)
+error
+plot(model_1$IterativeFitError/nrow(zip_train), type="l", ylim=c(0.4,1))
+lines(model_1$IterativeTestError/nrow(zip_test), type="l", col='red')
+```
+
+En esta gráfica vemos que el error de entrenamiento está más o menos estable,
+y está cercano al error de prueba. Esto significa que probablemente podemos mejorar
+reduciendo el sesgo. En este punto la tasa de aprendizaje parece tener un valor razonable, pues no vemos que el error de entrenamiento baja conforme iteramos.
+
+Podemos incrementar el tamaño de la capa oculta o reducir el parámetro de regularización. Hay que intentar ambas cosas, pero primero probamos con la regularización
+
+```{r, cache=T}
+set.seed(280572)
+model_2 <- mlp(x=x_train, targets_train, size=c(8), 
+             learnFunc = 'BackpropWeightDecay',
+             learnFuncParams = c(0.2, 1e-5, 0, 0), 
+             maxit = 30,
+             inputsTest = x_test, targetsTest = targets_test)
+preds <- predict(model_2, x_test)
+confusionMatrix(targets_test, preds)
+error <- 1 - sum(diag(confusionMatrix(targets_test, preds)))/nrow(zip_test)
+error
+plot(model_2$IterativeFitError/nrow(zip_train), type="l", ylim=c(0.0,0.7))
+lines(model_2$IterativeTestError/nrow(zip_test), type="l", col='red')
+```
+
+Mejoramos el desempeño considerablemente. En este punto vemos que reducir más el parámetro de regularización no necesariamente
+vamos a obtener una mejora grande. En la siguiente gráfica, vemos que empezamos a movernos hacia
+sobreajuste (por la diferencia entre error de prueba y error de entrenamiento)
+
+
+```{r, cache=T}
+set.seed(280572)
+model_3 <- mlp(x=x_train, targets_train, size=c(8), 
+             learnFunc = 'BackpropWeightDecay',
+             learnFuncParams = c(0.2, 1e-12, 0, 0), 
+             maxit = 30,
+             inputsTest = x_test, targetsTest = targets_test)
+preds <- predict(model_3, x_test)
+confusionMatrix(targets_test, preds)
+error <- 1 - sum(diag(confusionMatrix(targets_test, preds)))/nrow(zip_test)
+error
+plot(model_3$IterativeFitError/nrow(zip_train), type="l")
+lines(model_3$IterativeTestError/nrow(zip_test), type="l", col='red')
+```
+
+
+### ¿Qué pasa si el parámetro de aprendizaje es demasiado alto?
+
+Si el parámetro de aprendizaje es demaiado alto, la convergencia es pobre y observamos 
+saltos hacia arriba en el error de entrenamiento:
+
+```{r, cache = T}
+set.seed(280572)
+model_4 <- mlp(x=x_train, targets_train, size=c(8), 
+             learnFunc = 'BackpropWeightDecay',
+             learnFuncParams = c(8, 1e-12, 0, 0), 
+             maxit = 20,
+             inputsTest = x_test, targetsTest = targets_test)
+plot(model_4$IterativeFitError/nrow(zip_train), type="l", ylim=c(0.0,1))
+lines(model_4$IterativeTestError/nrow(zip_test), type="l", col='red')
+```
+
+
+### Más nueronas en capa oculta
+
+Si es computacionalmente factible, conviene comenzar con más nueronas en la capa
+oculta. Por ejemplo, podemos intentar el mismo número de nueronas que la capa de entrada, o un
+factor más grande (por ejemplo, el doble de neuronas en la capa oculta):
+
+```{r, cache=T}
+set.seed(280572)
+model_5 <- mlp(x=x_train_s, targets_train, size=c(300), 
+             learnFunc = 'BackpropWeightDecay',
+             learnFuncParams = c(0.025, 1e-6, 0, 0), 
+             maxit = 70,
+             inputsTest = x_test_s, targetsTest = targets_test)
+preds <- predict(model_5, x_test_s)
+confusionMatrix(targets_test, preds)
+error <- 1 - sum(diag(confusionMatrix(targets_test, preds)))/nrow(zip_test)
+error
+plot(model_5$IterativeFitError/nrow(zip_train), type="l")
+lines(model_5$IterativeTestError/nrow(zip_test), type="l", col='red')
+```
+
+### Más de una capa oculta
+
+```{r, cache=T}
+set.seed(280572)
+model_6 <- mlp(x=x_train_s, targets_train, size=c(200,200), 
+             learnFunc = 'BackpropWeightDecay',
+             learnFuncParams = c(0.15, 2*1e-5, 0, 0), 
+             maxit = 70,
+             inputsTest = x_test_s, targetsTest = targets_test)
+preds <- predict(model_6, x_test_s)
+confusionMatrix(targets_test, preds)
+error <- 1 - sum(diag(confusionMatrix(targets_test, preds)))/nrow(zip_test)
+error
+plot(model_6$IterativeFitError/nrow(zip_train), type="l")
+lines(model_6$IterativeTestError/nrow(zip_test), type="l", col='red')
+```
+
