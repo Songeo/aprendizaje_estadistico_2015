@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Clase 21: redes neuronales y backpropagation'
+categories: clase
+---
+
+[Material](https://www.dropbox.com/s/stm6f6ahu11xeg1/clase_21.zip?dl=1), [Notas](https://www.dropbox.com/s/9522qht8at7jepv/Notas_AE_21.pdf?dl=1)
