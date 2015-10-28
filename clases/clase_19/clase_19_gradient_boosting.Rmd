@@ -288,7 +288,7 @@ Podemos ver las importancias de Gini (como porcentaje, escaladas para que sumen 
 
 ```{r}
 #Resumen e importancias con el mejor número de iteraciones
-summary(mod.final,n.trees=best.iter.test) 
+summary(mod.final,n.trees=best.iter.test, normalize=TRUE) 
 ```
 
 3. Gráficas de dependencia parcial

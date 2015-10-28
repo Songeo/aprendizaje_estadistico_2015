@@ -7,6 +7,8 @@ output:
     theme: united
 ---
 
+### Ejemplo simple: ¿cómo construye entradas una red?
+
 ```{r, message=FALSE, warning=FALSE}
 library(knitr)
 library(ggplot2)
@@ -26,9 +28,9 @@ h <- function(x){
 }
 x <- seq(-2,2,0.1)
 p <- h(2-3*x^2) #probabilidad condicional de clase 1 (vs. 0)
-set.seed(2805)
-x_1 <- runif(30, -2, 2)
-g_1 <- rbinom(30, 1, h(2-3*x_1^2))
+set.seed(280577211)
+x_1 <- runif(40, -2, 2)
+g_1 <- rbinom(40, 1, h(2-3*x_1^2))
 datos <- data.frame(x_1,g_1)
 dat_p <- data.frame(x,p)
 g <- qplot(x,p, geom='line')
@@ -78,6 +80,10 @@ geom_line(data=dat_p, aes(x=x,y=p), col='red') +ylim(c(0,1))+
 ```
 
 
+### Ajuste de una red simple
+
+Necesitaremos dos funciones: una que calcula las salidas dadas las entradas (feed forward), y la devianza sobre el conjunto de entrenamiento:
+
 ```{r, fig.width=4, fig.height=3}
 ## esta función calcula los valores de cada nodo en toda la red,
 ## para cada entrada
@@ -108,10 +114,13 @@ dev(c(0,0,0,0,0,0,0))
 dev(rnorm(7))
 ```
 
-```{r}
-set.seed(5)
-salida <- optim(rnorm(7), dev, method='BFGS') # inicializar al azar punto inicial
-salida
+
+Ahora optimizamos con `optim`:
+
+```{r, fig.width=4, fig.height=3}
+set.seed(512)
+salida <- optim(runif(7,0,0.1), dev, method='BFGS', control = list(maxit=10000)) # inicializar al azar punto inicial
+salida$par
 beta <- salida$par
 
 ## hacer feed forward con beta encontroados
@@ -120,27 +129,32 @@ dat_2 <- data.frame(x, p_2=p_2)
 ggplot(dat_2, aes(x=x, y=p_2)) + geom_line()+
 geom_line(data=dat_p, aes(x=x,y=p), col='red') +ylim(c(0,1))+
    geom_point(data = datos, aes(x=x_1,y=g_1))
+```
 
-
-
+Los coeficientes están dados por (4 pesos para la primera capa oculta, y 3 pesos para la capa de salida):
+```{r}
 beta
 ```
+
+Nótese que obtenemos coeficientes con valores absolutos grandes, y la función ajustada tiene bordes agudos. Esto sucede típicamente porque falta regularizar. Podemos por ejemplo usar penalización $L^2$ de los coeficientes, para evitar que estos crezcan demasiado:
+
 
 ```{r}
 devianza.reg <- function(x, g, lambda){
     # esta función es una fábrica de funciones
    devianza <- function(beta){
          p <- feed.fow(beta, x)
-      - 2 * mean(g*log(p) + (1-g)*log(1-p)) + lambda*sum(beta^2)
+      - 2 * mean(g*log(p) + (1-g)*log(1-p)) + lambda*sum(beta^2) # 2o. término es el de regularización
    }
   devianza
 }
 
 
 
+
 dev.r <- devianza.reg(x_1, g_1, 0.0005) # crea función dev
 set.seed(5)
-salida <- optim(rnorm(7), dev.r, method='BFGS') # inicializar al azar punto inicial
+salida <- optim(runif(7,-.1,.1), dev.r, method='BFGS', control=list(maxit=100000)) # inicializar al azar punto inicial
 salida
 beta <- salida$par
 dev(beta)
@@ -152,5 +166,34 @@ ggplot(dat.2, aes(x=x, y=p_2)) + geom_line()+
 geom_line(data=dat_p, aes(x=x,y=p), col='red') +ylim(c(0,1))+
    geom_point(data = datos, aes(x=x_1,y=g_1))
 
+```
 
+### Utilizando nnet
+
+Para redes chicas podemos utilizar el paquete `nnet`:
+
+```{r, fig.width=4, fig.height=3}
+library(nnet)
+set.seed(12212)
+datos$g_1 <- factor(datos$g_1)
+nn <- nnet(g_1~x_1, data=datos, size = 2,maxit = 10000)
+nn$wts
+nn$value
+
+2*nn$value/40
+dev(nn$wts)
+qplot(x, predict(nn, newdata=data.frame(x_1=x)), geom='line')
+```
+
+Nótese también que si lo volvemos a correr no obtenemos la misma solución. El objetivo en general no es convexo, y en este caso particular tenemos una zona plana cerca de la solución que puede resultar de la optimización:
+
+```{r, fig.width=4, fig.height=3}
+set.seed(88222)
+nn <- nnet(g_1~x_1, data=datos, size = 2,maxit = 10000)
+nn$wts
+nn$value
+
+2*nn$value/40
+dev(nn$wts)
+qplot(x, predict(nn, newdata=data.frame(x_1=x)), geom='line')
 ```
