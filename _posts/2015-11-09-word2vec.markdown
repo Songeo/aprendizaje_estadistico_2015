@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  'Redes neuronales para lenguaje natural y word2vec'
+title:  'Clase 23: redes neuronales para lenguaje natural y word2vec'
 categories: clase
 ---
 
