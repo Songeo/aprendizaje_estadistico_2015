@@ -4,4 +4,4 @@ title:  'Clase 22: Redes neuronales convolucionales'
 categories: clase
 ---
 
-[Material](https://www.dropbox.com/s/0ulbt6af8tre8ii/clase_22.zip?dl=1), [Notas](https://www.dropbox.com/s/vw1caai5im766n9/Notas_AE_22.pdf?dl=1)
+[Material](https://www.dropbox.com/s/0ulbt6af8tre8ii/clase_22.zip?dl=1), [Notas](https://www.dropbox.com/s/vw1caai5im766n9/Notas_AE_22.pdf?dl=1), [Cuaderno en pdf](https://www.dropbox.com/s/g8i1woh192xk64j/Clase_22_redes_conv.pdf?dl=1)
