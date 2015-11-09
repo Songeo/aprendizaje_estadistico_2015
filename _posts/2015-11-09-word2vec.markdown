@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Redes neuronales para lenguaje natural y word2vec'
+categories: clase
+---
+
+[Material](https://www.dropbox.com/s/a0fyn77kgcw2lyo/clase_23.zip?dl=1), [Notas](https://www.dropbox.com/s/ojobg6lt8el7avp/Notas_AE_23.pdf?dl=1)
