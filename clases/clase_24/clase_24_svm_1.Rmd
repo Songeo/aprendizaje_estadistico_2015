@@ -1,0 +1,208 @@
+---
+title: "Máquinas de soporte vectorial"
+author: "Felipe González"
+date: Otoño 2015
+output: 
+  html_document: 
+    theme: united
+---
+
+```{r}
+library(ggplot2)
+```
+
+1. Hiperplanos de margen máximo
+--
+
+Ejemplo de tres hiperplanos separadores:
+
+```{r}
+set.seed(2805)
+
+beta <- c(-1,2)
+beta.0 <- 1
+dat.1 <- data.frame(x.1=rnorm(10,0,1), x.2=rnorm(10,0,1))
+head(dat.1)
+dat.1$valor <- as.matrix(dat.1)%*%beta - beta.0
+head(dat.1)
+dat.1$color[dat.1$valor < 0] <- 'negativo'
+dat.1$color[dat.1$valor > 0] <- 'positivo'
+ggplot(dat.1, aes(x=x.1,y=x.2, colour=color)) + geom_point(size=5) +
+  scale_colour_manual(values=c('red','gray')) +
+  geom_abline(intercept=beta.0/beta[2], slope=-beta[1]/beta[2]) +
+  geom_abline(intercept=beta.0/beta[2]+0.2, slope=-beta[1]/beta[2]) +
+  geom_abline(intercept=beta.0/beta[2]+0.1, slope=-beta[1]/beta[2]+0.4)
+```
+
+Optimizamos para encontrar el margen máximo
+
+```{r}
+
+
+objetivo <- function(X, y){
+  func.obj <- function(params){
+    beta <- params[1:2]
+    beta.0 <- params[3]
+    distancias <- (X%*%beta - beta.0)*y*(1/sqrt(sum(beta^2)))
+    minimo.margen <- min(distancias)
+    -minimo.margen
+  }
+  func.obj
+}
+X <- as.matrix(dat.1[,1:2])
+y <- (dat.1$color=='positivo') - (dat.1$color=='negativo')
+obj.1 <- objetivo(X, y)
+
+res <- optim(par=c(1,1,0), obj.1, method='BFGS')
+res
+beta <- res$par[1:2]
+beta.0 <- res$par[3]
+margen <- -res$value
+norma <- sqrt(sum(beta^2))
+ggplot(dat.1, aes(x=x.1,y=x.2, colour=color)) + geom_point(size=4) +
+  scale_colour_manual(values=c('red','gray80')) +
+  geom_abline(intercept=beta.0/beta[2], slope=-beta[1]/beta[2], colour='darkblue', size=1.5)+
+  geom_abline(intercept=(beta.0+margen*norma)/beta[2], slope=-beta[1]/beta[2], colour='darkblue')+
+  geom_abline(intercept=(beta.0-margen*norma)/beta[2], slope=-beta[1]/beta[2], colour='darkblue')
+
+
+```
+
+
+2. Clasificadores de soporte vectorial
+----
+
+En estos problemas, introducimos holgura.  Nota: en el paquete svm
+usamos **costo**: en lugar de considerar la restricción $\sum \zeta_i < c$, consideramos la función objetivo  $0.5*||\beta||^2 + C\sum \zeta_i$. Cuando C es grande, cuesta más exceder el margen, cuando $C$ es chica es menos costoso exceder el margen.
+$C$ grande corresponde a $c$ chica, y viceversa.
+
+
+
+````{r}
+set.seed(280512)
+dat.x <- expand.grid(x.1=seq(-4,4,0.1), x.2=seq(-4,4,0.1))
+dat.2.1 <- data.frame(x.1=rnorm(7,-1,1), x.2=rnorm(7,-1,1))
+dat.2.1$clase <- 1
+dat.2.2  <- data.frame(x.1=rnorm(7,1,1), x.2=rnorm(7,1,1))
+dat.2.2$ clase <- -1
+dat.2 <- rbind(dat.2.1, dat.2.2)
+dat.2$clase <- factor(dat.2$clase)
+ 
+ggplot(dat.2, aes(x=x.1, y=x.2, colour=factor(clase)))+geom_point(size=3)
+
+library(e1071)
+
+svm.1 <- svm(clase ~x.1 + x.2, data=dat.2, kernel = 'linear', cost=0.001 )
+svm.2 <- svm(clase ~x.1 + x.2, data=dat.2, kernel = 'linear', cost=1 )
+svm.3 <- svm(clase ~x.1 + x.2, data=dat.2, kernel = 'linear', cost=10000 )
+preds.1 <- predict(svm.1, newdata = dat.x)
+preds.2 <- predict(svm.2, newdata = dat.x)
+preds.3 <- predict(svm.3, newdata = dat.x)
+dat.x$preds.1 <- preds.1
+dat.x$preds.2 <- preds.2
+dat.x$preds.3 <- preds.3
+g.1 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.1))+geom_point(size=1) +
+  geom_point(data=dat.2, aes(x=x.1, y=x.2, colour=factor(clase)), size=3) +
+  labs(title='Costo chico')
+g.2 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.2))+geom_point(size=1) +
+  geom_point(data=dat.2, aes(x=x.1, y=x.2, colour=factor(clase)), size=3)+  labs(title='Costo mediano')
+
+g.3 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.3))+geom_point(size=1) + geom_point(data=dat.2, aes(x=x.1, y=x.2, colour=factor(clase)), size=3)+  labs(title='C grande')
+```
+
+
+```{r}
+g.1
+g.2
+g.3
+```
+
+
+¿Cómo se desempeñan con una muestra de prueba?
+```{r}
+dat.prueba.1 <- data.frame(x.1=rnorm(500,-1,1), x.2=rnorm(500,-1,1))
+dat.prueba.2 <- data.frame(x.1=rnorm(500,1,1), x.2=rnorm(500,1,1))
+dat.prueba.1$clase <- 1
+dat.prueba.2$clase <- -1
+dat.prueba <- rbind(dat.prueba.1, dat.prueba.2)
+dat.prueba$clase <- factor(dat.prueba$clase)
+
+
+
+mean(predict(svm.1, newdata = dat.prueba)!=dat.prueba$clase)
+mean(predict(svm.2, newdata = dat.prueba)!=dat.prueba$clase)
+mean(predict(svm.3, newdata = dat.prueba)!=dat.prueba$clase)
+
+
+```
+
+Y los vectores soporte son:
+```{r}
+svm.1$SV
+svm.2$SV
+svm.3$SV
+```
+el paquete kernlab hace gráficas ilustrativas, por ejemplo
+
+```{r}
+
+# install.packages('kernlab') si es necesario
+library(kernlab)
+
+
+z <- rnorm(500)
+dat.pos <- data.frame(x.1=rnorm(500)-z, x.2=rnorm(500)+z, y=1)
+dat.neg <- data.frame(x.1=2+rnorm(500), x.2=2+rnorm(500), y=-1)
+datos <- rbind(dat.pos, dat.neg)
+ind.train <- sample(1:nrow(datos), 300)
+datos.train <- datos[ind.train, ]
+datos.test <- datos[-ind.train, ]
+ggplot(datos.train, aes(x=x.1, y=x.2, colour=factor(y))) + geom_point()
+
+
+csv <- ksvm(y~x.1+x.2, data=datos.train, 
+  type="C-svc", kernel="vanilladot", C=100, scaled=FALSE)
+plot(csv, data=datos.train)
+```
+
+Podemos ver el efecto del costo con modelos de entradas extendidas. En el siguiente
+ejemplo consideramos una expansión cuadrática:
+
+
+```{r}
+set.seed(2805)
+dat.x <- expand.grid(x.1=seq(-4,4,0.1), x.2=seq(-4,4,0.1))
+dat.2.1 <- data.frame(x.1=rnorm(20,-2,1), x.2=rnorm(20,-2,1))
+dat.2.1.x <- data.frame(x.1=rnorm(20,2,1), x.2=rnorm(20,2,1))
+dat.2.1 <- rbind(dat.2.1, dat.2.1.x)
+dat.2.1$clase <- 1
+dat.2.2  <- data.frame(x.1=rnorm(40,0,1), x.2=rnorm(40,0,1))
+dat.2.2$ clase <- -1
+dat.2 <- rbind(dat.2.1, dat.2.2)
+dat.2$clase <- factor(dat.2$clase)
+
+ggplot(dat.2, aes(x=x.1, y=x.2, colour=factor(clase)))+geom_point(size=3)
+
+library(e1071)
+
+svm.1 <- svm(clase ~x.1 + x.2 + I(x.1*x.2)+I(x.1^2)+I(x.2^2), data=dat.2, kernel = 'linear', cost=0.01 )
+svm.2 <- svm(clase ~x.1 + x.2+ I(x.1*x.2)+I(x.1^2)+I(x.2^2), data=dat.2, kernel = 'linear', cost=1 )
+svm.3 <- svm(clase ~x.1 + x.2+ I(x.1*x.2+I(x.1^2)+I(x.2^2)), data=dat.2, kernel = 'linear', cost=1000 )
+preds.1 <- predict(svm.1, newdata = dat.x)
+preds.2 <- predict(svm.2, newdata = dat.x)
+preds.3 <- predict(svm.3, newdata = dat.x)
+dat.x$preds.1 <- preds.1
+dat.x$preds.2 <- preds.2
+dat.x$preds.3 <- preds.3
+g.1 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.1))+geom_point(size=1) +
+  geom_point(data=dat.2, aes(x=x.1, y=x.2, colour=factor(clase)), size=3) +
+  labs(title='Costo chico')
+g.2 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.2))+geom_point(size=1) +
+  geom_point(data=dat.2, aes(x=x.1, y=x.2, colour=factor(clase)), size=3)+  labs(title='Costo mediano')
+
+g.3 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.3))+geom_point(size=1) + geom_point(data=dat.2, aes(x=x.1, y=x.2, colour=factor(clase)), size=3)+  labs(title='C grande')
+g.1
+g.2
+g.3
+```
+
