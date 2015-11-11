@@ -11,10 +11,10 @@ output:
 library(ggplot2)
 ```
 
-1. Hiperplanos de margen máximo
+2. Hiperplanos separadores
 --
 
-Ejemplo de tres hiperplanos separadores:
+Cuando los datos son separables, típicamente hay más de un hiperplano separador, por ejemplo:
 
 ```{r}
 set.seed(2805)
@@ -34,10 +34,12 @@ ggplot(dat.1, aes(x=x.1,y=x.2, colour=color)) + geom_point(size=5) +
   geom_abline(intercept=beta.0/beta[2]+0.1, slope=-beta[1]/beta[2]+0.4)
 ```
 
+2. Hiperplanos de margen máximo
+----
+
 Optimizamos para encontrar el margen máximo
 
 ```{r}
-
 
 objetivo <- function(X, y){
   func.obj <- function(params){
@@ -53,7 +55,7 @@ X <- as.matrix(dat.1[,1:2])
 y <- (dat.1$color=='positivo') - (dat.1$color=='negativo')
 obj.1 <- objetivo(X, y)
 
-res <- optim(par=c(1,1,0), obj.1, method='BFGS')
+res <- optim(par=c(1,1,0), obj.1)
 res
 beta <- res$par[1:2]
 beta.0 <- res$par[3]
@@ -69,12 +71,19 @@ ggplot(dat.1, aes(x=x.1,y=x.2, colour=color)) + geom_point(size=4) +
 ```
 
 
-2. Clasificadores de soporte vectorial
+Los **vectores soporte** en este caso son
+
+```{r}
+soporte_ind <- abs((X%*%beta - beta.0)*y*(1/sqrt(sum(beta^2))) - margen)  < 1e-6
+X[soporte_ind, ]
+```
+
+
+3. Clasificadores de soporte vectorial
 ----
 
-En estos problemas, introducimos holgura.  Nota: en el paquete svm
-usamos **costo**: en lugar de considerar la restricción $\sum \zeta_i < c$, consideramos la función objetivo  $0.5*||\beta||^2 + C\sum \zeta_i$. Cuando C es grande, cuesta más exceder el margen, cuando $C$ es chica es menos costoso exceder el margen.
-$C$ grande corresponde a $c$ chica, y viceversa.
+En estos problemas, introducimos holguras.  Consideramos entonces la
+función objetivo  $0.5*||\beta||^2 + C\sum \zeta_i$. Cuando C es grande, cuesta más exceder el margen, cuando $C$ es chica es menos costoso exceder el margen.
 
 
 
@@ -111,6 +120,8 @@ g.3 <- ggplot(dat.x, aes(x=x.1, y=x.2, colour=preds.3))+geom_point(size=1) + geo
 ```
 
 
+Nótese que para costo $C$ grande, el clasificador hace un esfuerzo más grande para separar correctamente los casos, aún cuando el margen sea muy chico. Para costo $C$ chico, hay más margen excepto para algunos puntos que lo violan. ¿Qué es mejor?
+
 ```{r}
 g.1
 g.2
@@ -118,10 +129,11 @@ g.3
 ```
 
 
-¿Cómo se desempeñan con una muestra de prueba?
+¿Cómo se desempeñan con una muestra de prueba? En este caso, vemos que un costo alto no conviene para clasificar estos datos. Con costo grande, el clasificador sobreajusta.
+
 ```{r}
-dat.prueba.1 <- data.frame(x.1=rnorm(500,-1,1), x.2=rnorm(500,-1,1))
-dat.prueba.2 <- data.frame(x.1=rnorm(500,1,1), x.2=rnorm(500,1,1))
+dat.prueba.1 <- data.frame(x.1=rnorm(800,-1,1), x.2=rnorm(800,-1,1))
+dat.prueba.2 <- data.frame(x.1=rnorm(800,1,1), x.2=rnorm(800,1,1))
 dat.prueba.1$clase <- 1
 dat.prueba.2$clase <- -1
 dat.prueba <- rbind(dat.prueba.1, dat.prueba.2)
@@ -142,7 +154,11 @@ svm.1$SV
 svm.2$SV
 svm.3$SV
 ```
-el paquete kernlab hace gráficas ilustrativas, por ejemplo
+
+4. Otra visualización
+----
+
+El paquete kernlab hace gráficas ilustrativas, por ejemplo
 
 ```{r}
 
@@ -164,6 +180,10 @@ csv <- ksvm(y~x.1+x.2, data=datos.train,
   type="C-svc", kernel="vanilladot", C=100, scaled=FALSE)
 plot(csv, data=datos.train)
 ```
+
+
+5. Extendiendo entradas para obtener más flexibilidad
+----
 
 Podemos ver el efecto del costo con modelos de entradas extendidas. En el siguiente
 ejemplo consideramos una expansión cuadrática:
@@ -206,3 +226,4 @@ g.2
 g.3
 ```
 
+Nótese que aquí también costo grande sobreajusta. ¿Por qué? ¿Qué puedes decir acerca del clasificador de Bayes para este problema? ¿Cuál de estos clasificadores se parece más al clasificador de Bayes?
