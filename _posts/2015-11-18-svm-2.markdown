@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Máquinas de soporte vectorial, parte 2'
+categories: clase
+---
+
+[Material]( https://www.dropbox.com/s/9pskzrfo0qiy2nx/clase_25.zip?dl=1), [Notas](https://www.dropbox.com/s/d2msq8ced4rco0p/Notas_AE_24.pdf?dl=1)
