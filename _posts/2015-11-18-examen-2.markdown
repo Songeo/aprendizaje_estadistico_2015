@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Examen 2: instrucciones'
+categories: clase
+---
+
+[Examen](https://www.dropbox.com/s/v7dfnrwygapq2kh/examen_2.pdf?dl=1). La fecha del examen es 30 de enero. No es necesario entregar nada en este examen (los prácticos son los del concurso).
