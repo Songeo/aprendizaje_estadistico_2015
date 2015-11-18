@@ -1,0 +1,177 @@
+---
+title: "Máquinas de soporte vectorial 2"
+author: "Felipe Gonzalez"
+date: "November 5, 2014"
+output: html_document
+---
+
+Primero calculamos distintas fronteras de clasificación para distintos costos
+para un ejemplo simulado.
+
+```{r}
+library(caret)
+library(e1071)
+library(ggplot2)
+```
+```{r}
+set.seed(280511)
+dat.grid <- expand.grid(x.1=seq(-4,6,0.1), x.2=seq(-4,4,0.1))
+ 
+sim.data <- function(n){
+    dat.pos.1 <- data.frame(x.1=rnorm(n,0,1), x.2=rnorm(n,0,1))
+    dat.pos.1$clase <- 1
+    dat.pos.2 <- data.frame(x.1=rnorm(n,4,0.5), x.2=rnorm(n,0,0.5))
+    dat.pos.2$clase <- 1
+    dat.pos <- rbind(dat.pos.1, dat.pos.2)
+    dat.neg.1 <- data.frame(x.1=rnorm(n,-2,1), x.2=rnorm(n,-2,1))
+    dat.neg.2 <- data.frame(x.1=rnorm(n,3,1.2), x.2=rnorm(n,1,1))
+    dat.neg <- rbind(dat.neg.1, dat.neg.2)
+    dat.neg$clase <- 0
+    dat.out <- rbind(dat.pos, dat.neg)
+    dat.out$clase <- factor(dat.out$clase)
+    dat.out
+}
+dat.entrena <- sim.data(150)
+dat.prueba <- sim.data(5000)
+ggplot(dat.entrena, aes(x=x.1, y=x.2, colour=factor(clase)))+geom_point(size=3)
+```
+
+Consideramos primero kernel radial (gaussiano). Conforme aumentamos el costo,
+vemos que el ajusta más fuerte para encontrar fronteras que clasifican correctamente:
+
+
+```{r}
+svm.1 <- svm(clase ~x.1 + x.2 , data=dat.entrena, kernel = 'radial', cost=0.01, gamma=1 )
+svm.2 <- svm(clase ~x.1 + x.2, data=dat.entrena, kernel = 'radial', cost=100, gamma=1 )
+svm.3 <- svm(clase ~x.1 + x.2, data=dat.entrena, kernel = 'radial', cost=100000, gamma=1 )
+dat.grid$pred.1 <- predict(svm.1, newdata = dat.grid)
+dat.grid$pred.2 <- predict(svm.2, newdata = dat.grid)
+dat.grid$pred.3 <- predict(svm.3, newdata = dat.grid)
+ ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.1)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.2)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.3)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+
+```
+
+Conforme costo aumenta, la varianza aumenta pero el sesgo potencialmente decrece.
+(menos costo= más regularización).
+
+El parámetro gamma (que es $\gamma=1/\sigma^2$) establece que tan rápido caen
+las *similitudes* o productos punto entre datos. 
+gamma grande implica que la similitud decae más rápidamente:
+
+
+```{r}
+svm.1 <- svm(clase ~x.1 + x.2 , data=dat.entrena, kernel = 'radial', cost=10, gamma=0.1 )
+svm.2 <- svm(clase ~x.1 + x.2, data=dat.entrena, kernel = 'radial', cost=10, gamma=10 )
+svm.3 <- svm(clase ~x.1 + x.2, data=dat.entrena, kernel = 'radial', cost=10, gamma=100 )
+dat.grid$pred.1 <- predict(svm.1, newdata = dat.grid)
+dat.grid$pred.2 <- predict(svm.2, newdata = dat.grid)
+dat.grid$pred.3 <- predict(svm.3, newdata = dat.grid)
+ ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.1)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.2)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.3)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+
+```
+
+Conforme gamma aumenta, la varianza aumenta pero el sesgo potencialmente decrece.
+(menor gamma = más regularización)
+
+Seleccionamos usando estos dos parámetros. Por ejemplo, usando validación cruzada:
+
+
+```{r}
+library(doMC)
+registerDoMC(cores = 6)
+set.seed(221)
+train.control <- trainControl(method='cv', number=10)
+tune.grid <- expand.grid(list(sigma=c(0.1,1,10,100,100),
+                              C=c(0.1,1,10,100,100)))
+svmFit <- train(x=dat.entrena[,1:2], y=dat.entrena$clase,
+    method = "svmRadial", tuneGrid = tune.grid,
+    trControl = train.control, scaled = TRUE)
+svmFit
+
+```
+
+
+```{r}
+svmFit$finalModel
+```
+
+```{r}
+tune.grid <- expand.grid(list(sigma=c(0.25,0.5,1,2,4,8),
+                              C=c(0.25,0.5,1,2,4,8,10)))
+svmFit.2 <- train(x=dat.entrena[,1:2], y=dat.entrena$clase,
+    method = "svmRadial", tuneGrid = tune.grid,
+    trControl = train.control, scaled = TRUE)
+svmFit.2
+svmFit.2$finalModel
+``` 
+
+Evaluamos nuestro modelo final:
+
+```{r}
+preds.prueba <- predict(svmFit.2, newdata =  dat.prueba[,1:2])
+mean(preds.prueba!=dat.prueba$clase)
+```
+
+```{r}
+
+
+dat.grid$pred.1 <- predict(svmFit.2, newdata = dat.grid[,1:2])
+
+ ggplot(dat.grid, aes(x=x.1, y=x.2))+geom_point(size=3, alpha=0.2, aes(colour=pred.1)) +
+    geom_point(data=dat.entrena, aes(colour=factor(clase)))
+```
+
+
+Ejemplo
+----
+Ahora probamos con otro conjunto de datos. Por ejemplo, si queremos separar
+5s del resto de los dígitos
+
+```{r}
+library(ElemStatLearn)
+train.1 <- data.frame(zip.train[sample(1:nrow(zip.train), 3000),])
+train.1[,1] <- factor(as.numeric(train.1[,1]==1))
+table(train.1[,1])
+```
+
+
+```{r, cache=T}
+
+
+set.seed(21)
+train.control <- trainControl(method='cv', number = 10)
+tune.grid <- expand.grid(list(sigma=c(0.01,0.1,1),
+                              C=c(10,100,1000)))
+svmFit.rad <- train(x=train.1[,-1], y=train.1[,1],
+    method = "svmRadial", tuneGrid = tune.grid,
+    trControl = train.control, scaled = TRUE)
+svmFit.rad
+```
+
+
+```{r}
+tune.grid <- expand.grid(list(C=c(0.0001, 0.001,0.01,1,100)))
+svmFit.lineal <- train(x=train.1[,-1], y=train.1[,1],
+    method = "svmLinear", tuneGrid = tune.grid,
+    trControl = train.control, scaled = TRUE)
+svmFit.lineal
+```
+
+
+```{r, cache=T}
+tune.grid <- expand.grid(list(degree=c(2,4,6), C=c(0.01,0.1,1,10), scale=1))
+svmFit.polinomial <- train(x=train.1[,-1], y=train.1[,1],
+    method = "svmPoly", tuneGrid = tune.grid,
+    trControl = train.control, scaled = TRUE)
+svmFit.polinomial
+```
