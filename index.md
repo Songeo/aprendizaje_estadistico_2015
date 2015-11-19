@@ -4,7 +4,6 @@ layout: default
 
 {% include about.md %}
 - - - 
-{% include scores_mov.md %}
 {% include scores_dat.md %}
 - - -
 
