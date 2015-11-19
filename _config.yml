@@ -9,4 +9,4 @@ twitter_username: felipexgonzalez
 github_username:  felipegonzalez
 
 # Build settings
-markdown: redcarpet
+markdown: kramdown 
