@@ -5,7 +5,7 @@ layout: default
 {% include about.md %}
 - - - 
 {% include scores_mov.md %}
-{% include /Users/felipegonzalez/Dropbox/Public/scores_dat.md %}
+{% include scores_dat.md %}
 - - -
 
 ## Clases, material y avisos
