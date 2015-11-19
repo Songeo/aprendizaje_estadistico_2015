@@ -4,7 +4,9 @@ layout: default
 
 {% include about.md %}
 - - - 
+
 {% include scores_dat.md %}
+
 - - -
 
 ## Clases, material y avisos
