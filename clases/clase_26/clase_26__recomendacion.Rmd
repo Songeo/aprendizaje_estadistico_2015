@@ -183,27 +183,25 @@ arrange(filter(medias.p.2, num_calif_peli > 500), desc(media_peli)) %>%
 2. Selecciona una muestra de películas y usuarios. Separa las evaluaciones de esos usuarios y películas en una muestra de entrenamiento y otra de validación. Puedes empezar con
 ```{r}
 set.seed(28882)
-muestra_usuarios <- sample(unique(dat.muestra$usuario_id), 30000)
+muestra_usuarios <- sample(unique(dat.muestra$usuario_id), 40000)
 valida_usuarios <- sample(muestra_usuarios, 10000)
 valida_pelis <- sample(unique(dat.muestra$peli_id), 2000 )
 dat.2 <- dat.muestra %>%
   filter(usuario_id %in% muestra_usuarios) %>%
   mutate(valida_usu = usuario_id %in% valida_usuarios) %>%
-  mutate(entren_usu = (usuario_id %in% muestra_usuarios) & !valida_usu ) %>%
   mutate(valida_peli = peli_id %in% valida_pelis )
 rm(dat.muestra)
 ```
 
 
 ```{r}
-rm(valida_pelis)
-rm(valida_usuarios)
-rm(muestra_usuarios)
 dat.valida <- dplyr::filter(dat.2, valida_usu & valida_peli)
-dat.entrena <- dplyr::filter(dat.2, entren_usu | !valida_peli)
+dat.entrena <- dplyr::filter(dat.2, !(valida_usu) | !valida_peli)
 nrow(dat.entrena) + nrow(dat.valida)
+nrow(dat.entrena)
+nrow(dat.valida)
 nrow(dat.2)
-rm(dat.2)
+#rm(dat.2)
 ```
 
 
@@ -223,16 +221,15 @@ Nota que puede ser que algunas películas seleccionadas en validación no tengan
 ```{r}
 table(is.na(dat.valida$media.pred))
 ```
-En este ejemplo solo aparecen algunos faltantes, y si hubiera más
-podríamos usar el promedio general de las predicciones. Evaluamos ahora el error:
+No sucede en este ejemplo, pero si sucediera podríamos usar el promedio general de las predicciones. Evaluamos ahora el error:
 
 ```{r}
-sqrt(mean((dat.valida$calif - dat.valida$media.pred)^2,na.rm=T))
+sqrt(mean((dat.valida$calif - dat.valida$media.pred)^2, na.rm = T))
 ```
 
 
 
-### Heterogenediad en uso de la escala.
+### Heterogeneidad en uso de la escala.
 
 Cuando tratamos con datos en escala encontramos un problema técnico que es el uso distinto
 de la escala por los usuarios, **independientemente de sus gustos**
@@ -291,11 +288,11 @@ $$X_2 = N + S_2,$$
 donde $S_1$ y $S_2$ representan el gusto por la película, y $N$ representa el nivel general
 de calificaciones. Consideramos que son variables aleatorias ($N$ varía con las personas, igual que $S_1$ y $S_2$).
 
-Alguien nos podría dar un manazo por calcular 
+Alguien podría objetar a calcular
 
 $$Cov(X_1,X_2)$$
 
-para estimar el grado de correlación de *gusto por las dos películas*, porque estas son variables ordinales. Pero nos da un manazo por la razón equivocada. La verdadera razón es que buscamos
+para estimar el grado de correlación de *gusto por las dos películas*, porque estas son variables ordinales. Pero la objeción puede ser por la razón equivocada. La verdadera razón es que buscamos
 
 $$Cov(S_1, S_2)$$
 
@@ -392,7 +389,7 @@ aún cuando el último término sea chico (de orden $\frac{1}{k^2}$)
 Así que ahora las correlaciones estimadas pueden tener sesgo hacia 
 abajo, especialmente si $k$ es chica.
 
-Más avanzado, enfoque bayesiano: http://onlinelibrary.wiley.com/store/10.1002/0470863692.oth3/asset/oth3.pdf;jsessionid=B449423C7DF1CEF9C814A9918C1A268F.f02t04?v=1&t=i6md84fd&s=91a5f34a9a89f18835eaa768013921d922e08615
+
 
 ### Modelo de referencia 
 
@@ -460,6 +457,51 @@ sqrt(mean((dat.valida.2$prediccion - dat.valida.2$calif)^2))
 
 
 
+
+
+### Ejercicio:datos de netflix {#ejemplo} 
+
+Adicionalmente a este problema, también tenemos la dificultad del ruido cuando tenemos pocos artículos
+para centrar las calificaciones de usuarios o películas. Por ejemplo:
+
+
+
+Una opción es regularizar calificaciones a la media. Podríamos entonces hacer
+
+
+$$
+\hat{x_{ij}} = \hat{\mu} + \frac{n_i}{\lambda+n_i} \hat{a_i} + \frac{m_j}{\lambda+m_j}\hat{b_j} 
+$$
+Que equivale a encoger las predicciones hacia la media general cuando el número de evaluaciones
+es bajo. El grado de encogimiento depende de $\lambda$.
+
+Prueba con $\lambda=0.01,0.1,1,10,100,1000$. ¿Qué tanto puedes mejorar los resultados sobre el conjunto de 
+validación?
+
+```{r}
+error.valida <- sapply(c(0.001,0.01,0.1,1,5,10,20,40,60,80,100,200), 
+                function(lambda){
+
+                  dat.valida.2 <- dat.valida %>%
+                    left_join(medias.usuario.e, by='usuario_id') %>%
+                    left_join(medias.peliculas.e, by='peli_id') %>%
+                    mutate(media.gral = media.gral.e) %>%
+                    mutate(prediccion = media.gral + (num_calif_usu/(num_calif_usu+lambda))*(media_usu - media.gral) +
+             (num_calif_peli/(num_calif_peli+lambda))*(media_peli-media.gral))
+                 dat.valida.2$prediccion[is.na(dat.valida.2$prediccion)] <- media.gral.e
+  
+                 sqrt(mean((dat.valida.2$prediccion - dat.valida.2$calif)^2))
+})
+
+plot(error.valida)
+error.valida
+```
+
+Veremos más adelante cómo lidiar con este problema de una mejor manera.
+
+
+
+
 ### Filtrado colaborativo
 
 Además de usar promedios generales por película, podemos utilizar similitud de películas/personas
@@ -470,7 +512,8 @@ más simple del filtrado colaborativo.
 Comencemos entonces con la siguiente idea: Supongamos que queremos hacer una predicción
 para el usuario $i$ en la película $j$. 
 
-La idea general es encontrar películas similares a $j$ que haya visto $i$, y ajustar la predicción según la calificación de estas películas similares.
+La idea general es encontrar películas similares a $j$ que haya visto $i$, que denotamos como
+$N(i,j)$, y ajustar la predicción según la calificación de estas películas similares.
 
 Tomamos entonces nuestra predicción
 base, que le llamamaos $x_{ij}^0$ y hacemos
@@ -556,19 +599,19 @@ Centramos las calificaciones por usuario y seleccionamos tres películas que
 pueden ser interesantes.
 
 ```{r}
-dat.entrena <- dat.entrena %>%
+dat.entrena.c <- dat.entrena %>%
   group_by(usuario_id) %>%
   mutate(calif.c = calif - mean(calif))
 
 ## calculamos un id secuencial.
-dat.entrena$id_seq <- as.numeric(factor(dat.entrena$usuario_id))
+dat.entrena.c$id_seq <- as.numeric(factor(dat.entrena.c$usuario_id))
 
 library(stringr)
 filter(pelis.nombres, str_detect(nombre,'Gremlins'))
 filter(pelis.nombres, str_detect(nombre,'Harry Met'))
-dat.1 <- filter(dat.entrena, peli_id==2897)
-dat.2 <- filter(dat.entrena, peli_id==6482)
-dat.3 <- filter(dat.entrena, peli_id==2660)
+dat.1 <- filter(dat.entrena.c, peli_id==2897)
+dat.2 <- filter(dat.entrena.c, peli_id==6482)
+dat.3 <- filter(dat.entrena.c, peli_id==2660)
 ```
 
 Juntamos usuarios que calificaron cada par:
@@ -595,13 +638,14 @@ dcos(comunes.2$calif.c, comunes.2$calif.c.2)
 
 Así que las dos Gremlins son similares, pero Gremlins 2 y Harry Met Sally no son similares.
 
-###
+
+##
 
 Podemos ahora seleccionar algunas películas y ver cuáles son películas similares que nos podrían ayudar a hacer recomendaciones:
 
 ```{r}
 
-dat.entrena.2 <- dat.entrena %>% ungroup() %>% select(peli_id, id_seq, calif.c)
+dat.entrena.2 <- dat.entrena.c %>% ungroup() %>% dplyr::select(peli_id, id_seq, calif.c)
 
 ejemplos <- function(pelicula){
   mi_peli <- filter(dat.entrena.2, peli_id==pelicula) %>% 
@@ -613,7 +657,7 @@ ejemplos <- function(pelicula){
       summarise(dist = dcos(calif.c, calif.c.1)) %>% 
       data.frame() %>%
       left_join(medias.p.2)
-  out.sum %>% arrange(desc(dist))  %>% select(nombre, dist, num_calif_peli)
+  out.sum %>% arrange(desc(dist))  %>% dplyr::select(nombre, dist, num_calif_peli)
 }
 
 ```
@@ -632,6 +676,8 @@ ejemplos(2660) %>% filter(num_calif_peli>300) %>% head(20)
 
 El problema otra vez es similitudes ruidosas que provienen de pocas evaluaciones en común. 
 Intenta con otros ejemplos de películas que te interesen.
+
+
 
 ### Factores latentes para recomendación
 
@@ -673,7 +719,7 @@ Así que al usuario 1 le recomndamos la película 3, pero al usuario 3 le recome
 ###
 
 La idea es entonces encontrar pesos para películas $u$ y para usuarios $v$ de forma que
-$X\approx \tilde{X} = uv^t$$: podemos reproducir las calificaciones observadas a partir de nuestro modelo de factores latentes.
+$X\approx \tilde{X} = uv^t$: queremos reproducir las calificaciones observadas a partir de nuestro modelo de factores latentes.
 
 Nótese sin embargo que hay varias dimensiones que pueden describir a películas y usuarios:
 por ejemplo, seria-divertida, artística-hollywood, ciencia ficción, con/sin violencia, etc. 
@@ -764,6 +810,7 @@ $$X^0 + \tilde{X}$$
 
 --------
 
+
 ### Ejercicio {##ejemplo}
 En este ejercicio calcularemos una dimensión latente para un conjunto chico de películas.
 Intentaremos minimizar directamente el error cuadrático para los residuales del modelo base.
@@ -771,17 +818,8 @@ Considera las siguiente evaluaciones:
 
 
 ```{r}
-usuarios <- c(64439, 30173, 7971, 81729, 96610, 9466, 5024, 84456, 28669, 
-5955, 88269, 77154, 59008, 3603, 57215, 4952, 19370, 81424, 34536, 
-42813, 87777, 81418, 12838, 17007, 40327, 91128, 99238, 47269, 
-43128, 28311, 79384, 78910, 7050, 13100, 32954, 24384, 29636, 
-93864, 88961, 4917, 57986, 9130, 99462, 20168, 39041, 19515, 
-45769, 32390, 46529, 43356, 61616, 9296, 1935, 39007, 24727, 
-25009, 23552, 74520, 40625, 49740, 17638, 36991, 99527, 5030, 
-2349, 4089, 8323, 41549, 20687, 31645, 24096, 14233, 46019, 86846, 
-1880, 38964, 828, 61839, 28042, 83139, 17568, 38733, 94187, 5257, 
-10712, 83282, 31067, 95233, 91872, 90404, 89505, 60377, 99552, 
-4678, 32424, 73696, 1060, 14706, 16346, 4862)
+set.seed(9932)
+usuarios <- sample(unique(dat.entrena.c$id_seq),300)
 
 peliculas <-c(175, 191, 457, 571, 607, 758, 886, 985, 1110, 1145, 1202, 1220, 
 1428, 1542, 1798, 1865, 1905, 1962, 2122, 2152, 2372, 2452, 2782, 
@@ -802,12 +840,13 @@ peliculas <-c(175, 191, 457, 571, 607, 758, 886, 985, 1110, 1145, 1202, 1220,
 15755, 15844, 15922, 16082, 16242, 16265, 16272, 16377, 16668, 
 16765, 16879, 16882, 16954, 17157, 17169, 17324, 17355, 17560, 
 17627)
-muestra_chica <-  left_join(dat.entrena, medias.p.2) %>% 
+muestra_chica <-  left_join(dat.entrena.c, medias.p.2) %>% 
                   filter(peli_id %in% peliculas, id_seq %in% usuarios) %>% 
-                  select(peli_id, id_seq, calif, nombre)
+                  dplyr::select(peli_id, id_seq, calif, nombre)
 head(muestra_chica)
 head(unique(muestra_chica$nombre))
 ```
+
 
 Construimos las predicciones del modelo base:
 
@@ -817,6 +856,8 @@ m_1 <- muestra_chica %>% group_by(peli_id) %>% mutate(media.p = mean(calif)) %>%
   ungroup %>% mutate(media.t = mean(calif))
 m_1$p_id <- as.numeric(factor(m_1$peli_id))
 m_1$u_id <- as.numeric(factor(m_1$id_seq))
+max(m_1$p_id)
+max(m_1$u_id)
 m_1$usuario_id <- NULL
 m_1$peli_id <- NULL
 head(m_1)
@@ -841,9 +882,10 @@ también calcular el gradiente, que es fácilmente calculable, para hacer más r
 los cálculos:
 
 ```{r}
+no_usuarios <- 300
 error_1 <- function(params){
-  u <- params[1:55]
-  v <- params[(55+1):(55+180)]
+  u <- params[1:no_usuarios]
+  v <- params[(no_usuarios+1):(180+no_usuarios)]
   ## construir ajustados
   ajuste <- apply(X, 1, function(x){ 
     u[x['u_id']] * v[x['p_id']]  
@@ -854,16 +896,16 @@ error_1 <- function(params){
 }
 
 grad_1 <- function(params){
-  u <- params[1:55]
-  v <- params[(55+1):(55+180)]
-  grad <- rep(0,55+180)
-  for(i in 1:55){
+  u <- params[1:no_usuarios]
+  v <- params[(no_usuarios+1):(180+no_usuarios)]
+  grad <- rep(0,no_usuarios+180)
+  for(i in 1:no_usuarios){
     X.u <- X[X[,'u_id']==i,, drop=FALSE]
     grad[i] <- -2*mean((X.u[,'res'] - u[i]*v[X.u[,'p_id']])*v[X.u[,'p_id']]) 
   }
   for(j in 1:180){
      X.p <- X[X[,'p_id']==j, , drop=FALSE]
-    grad[j+55] <- -2*mean((X.p[,'res'] - u[X.p[,'u_id']]*v[j])*u[X.p[,'u_id']])
+    grad[j+no_usuarios] <- -2*mean((X.p[,'res'] - u[X.p[,'u_id']]*v[j])*u[X.p[,'u_id']])
   }
   grad[is.nan(grad)] <-0
   grad
@@ -873,27 +915,28 @@ library(compiler)
 error_c <- cmpfun(error_1)
 grad_c <- cmpfun(grad_1)
 set.seed(2120)
-inicial <- rnorm(235,0,0.1)
+inicial <- rnorm(no_usuarios+180,0,0.1)
 res <- optim(inicial, fn=error_c, gr=grad_c, method='BFGS',control=list(trace = TRUE, maxit=200))
 length(res)
 ```
+
 
 Podemos examinar las películas en el primer factor latente:
 
 ```{r}
 usuarios.nr <- data.frame(X) %>% group_by(u_id) %>% tally
-usuarios.nr$coef <- res$par[1:55]
+usuarios.nr$coef <- res$par[1:294]
 
 xx <- unique(m_1[,c('p_id','nombre')])
-xx$dim.1 <- res$par[56:(55+180)]
+xx$dim.1 <- res$par[(no_usuarios+1):(no_usuarios+180)]
 xx %>% arrange(dim.1) %>% data.frame()
 
 ```
 
 
 ```{r}
-  u <- res$par[1:55]
-  v <- res$par[56:235]
+  u <- res$par[1:(no_usuarios)]
+  v <- res$par[(no_usuarios+1):(no_usuarios+180)]
   m_1 <- m_1 %>% data.frame
 m_1$ajuste <- apply(m_1, 1, function(reng){ 
     u[as.numeric(reng['u_id'])] * v[as.numeric(reng['p_id'])]  
@@ -903,48 +946,9 @@ m_1$ajuste <- apply(m_1, 1, function(reng){
 
 ```
 
+
+¿Cómo describirías esta dimensión?
 Examina a las personas. ¿Según sus gustos caen del lado de la dimensión que esperarías?
-
-
-###
-
-Regresaremos a este enfoque más adelante.
-
-
-### Descomposición en valores singulares
-
-Una técnica usual que se puede utilizar para este tipo de problemas
-es la descomposición en valores singulares. En este caso, buscamos descomponer
-una matriz $X$ de temaño $nxm$ mediante
-
-$$X=UDV^t$$
-
-donde $U$ y $V$ son matrices ortogonales de tamaño $nxn$, $mxm$ y $D$ es una matriz
-rectangular diagonal no negativa de tamaño $nxm$, con los componentes de su diagonal ordenados de forma decreciente. 
-
-Resulta ser que esta descomposición siempre existe. Ahora supongamos que escogemos una $k$ chica, y definimos
-- $U_k$ como la submatriz $nxk$  de $U$ donde seleccionamos las primeras $k$ columnas,
--  $V_k$ la submatriz $mxk$ de $V$ donde seleccionamos las primeras $k$ columnas,
-- $D_k$ una matriz diagonal de $kxk$ (primeros $k$ renglones y $k$ columnas de $D$)
-
-Entonces $X^k=U_k D_k V_k^t$ es **la matriz de rango** $k$ que minimiza
-$$\sum (X_{ij} -X_{ij}^k )^2$$
-
-
-
-Desde este punto de vista, esta descomposición parece resolver precisamente el
-problema que queríamos: aproximar lo más cercano posible con una descomposición de matrices de rango bajo. En nuestro caso, podríamos tomar
-- $U' = U_k D_k^{1/2}$
-- $V' = D_k^{1/2} V_k$
-para obtener la descomposición que propusimos arriba.
-
-
-- El problema es que usualmente la descomposición en valores singulares está definida para matrices **sin datos faltantes**. Esto implica que para usar los algoritmos de SVD tenemos que rellenar con ceros la matrix de calificaciones centradas, y esto es algo que preferiríamos evitar.
-
-
-Calcular la DVS es computacionalmente pesado, pero existen algoritmos rápidos cuando sólo queremos calcular unas cuantas dimensiones latentes y/o cuando la matriz $X$  que queremos aproximar es rala. Como supondremos que las calificaciones centradas no dadas están en 0 (ni me gusta ni no me gusta), podemos aprovechar la estructura rala de la matriz resultante.
-
-- Ver ejemplo en script netflix_svd.R
 
 
 ### Descomposición de matrices y regularización
@@ -953,7 +957,7 @@ Regresamos ahora a nuestro problema original de encontrar directamente una desco
 
 $$\tilde{X} = UV^t$$
 
-de forma que el error se minimice sobre las calificaciones observadas, sin agregar ceros adicionales como hicimos en la descomposición en valores singulares.
+de forma que el error se minimice sobre las calificaciones observadas.
 
 Tenemos que resolver dos problemas: construir un algoritmo escalable, y lidiar con los resultados ruidosos que obtenemos cuando existen películas o usuarios con pocas evaluaciones. Aquí lidiamos primero con el problema del ruido.
 
@@ -984,80 +988,10 @@ de el número de calificaiones del usuario $i$ o de la película $j$.
 
 Escogemos $\lamba$ para obtener soluciones más parsimoniosas con menor error de validación.
 
-
-### Ejemplo {#ejemplo}
-
-Regresamos a nuestro problema anterior:
-
-```{r}
-error_1 <- function(params){
-  u <- params[1:100]
-  v <- params[101:280]
-  ## construir ajustados
-  ajuste <- apply(X, 1, function(x){ 
-    u[x['u_id']] * v[x['p_id']]  
-    })
-  ## calcular error
-  salida <- mean((m_1$res -ajuste)^2) + 0.0005*sum(u^2)+0.0005*sum(v^2)
-  salida
-}
-
-grad_1 <- function(params){
-  u <- params[1:100]
-  v <- params[101:280]
-  grad <- rep(0,280)
-  for(i in 1:100){
-    X.u <- X[X[,'u_id']==i,, drop=FALSE]
-    grad[i] <- -2*mean((X.u[,'res'] - u[i]*v[X.u[,'p_id']])*v[X.u[,'p_id']]) + 0.001*u[i]
-  }
-  for(j in 1:180){
-     X.p <- X[X[,'p_id']==j, , drop=FALSE]
-    grad[j+100] <- -2*mean((X.p[,'res'] - u[X.p[,'u_id']]*v[j])*u[X.p[,'u_id']])+0.001*v[j]
-  }
-  grad[is.nan(grad)] <-0
-  grad
-}
-
-library(compiler)
-error_c <- cmpfun(error_1)
-grad_c <- cmpfun(grad_1)
-set.seed(2120)
-inicial <- rnorm(280,0,0.1)
-res <- optim(inicial, fn=error_c, gr=grad_c, method='BFGS',control=list(trace = TRUE, maxit=200))
-length(res)
-```
+Este problema usualmente se resuelve con descenso estocástico.
 
 
-```{r}
-xx.r <- unique(m_1[,c('p_id','nombre')])
-xx.r$dim.1 <- res$par[101:280]
-xx.r %>% arrange(dim.1) %>% data.frame()
-```
-
-Consideremos lo que pasa con los usuarios:
-
-```{r}
-usuarios.r <- data.frame(X) %>% group_by(u_id) %>% tally
-usuarios.r$coef.r <- res$par[1:98]
-res.usuarios <- left_join(usuarios.nr, usuarios.r)
-ggplot(res.usuarios, aes(x=coef, y=coef.r, size=n))+geom_point()
-```
-
-donde notamos que por lo menos para dos usuarios (con pocas evaluaciones), 
-con el método regularizado obtenemos mejores estimaciones.
-
-
-
-### Descomposición de matrices y descenso estocástico
-
-Regresamos ahora a nuestro problema original de encontrar directamente una descomposición
-
-$$\tilde{X} = UV^t$$
-
-de forma que el error se minimice sobre las calificaciones observadas, sin agregar ceros adicionales. El enfoque que vimos anteriormente donde calculamos el gradiente y la función de error sobre todos los casos de entrenamiento puede ser poco escalable. En lugar de eso, utilizaremos descenso estocástico en gradiente.
-
-
-### Descenso estocástico en gradiente.
+### Descenso estocástico en gradiente (recordatorio).
 
 Esta técnica de optimización es útil para conjuntos de datos grandes. La idea es muestrear partes del conjunto de entrenamiento y minimizar el gradiente sobre los casos seleccionados, y repetir.
 
@@ -1153,7 +1087,6 @@ Para aproximar la solución $\min_\beta L(\beta)$ podemos usar descenso estocás
 2. Para cada $i=1,\ldots,n$ caso de entrenamiento, hacemos
 $$\beta_{k+1} = \beta_{k} - \alpha \nabla L(x_i,y_i, \beta_k)$$
 3. Repetir 2 hasta obtener un mínimo aproximado
-
 
 
 
