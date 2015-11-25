@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Clase 27: recomendación y factores latentes'
+categories: clase
+---
+
+[Material](https://www.dropbox.com/s/dyh52fg4zbs1ysy/clase_27.zip?dl=1), mismos datos de la clase anterior. [Notas de curso de Stanford](http://web.stanford.edu/class/cs246/slides/08-recsys2.pdf). Ver también capítulo de recomendación de nuestra referencia Mining Massive Datasets.
