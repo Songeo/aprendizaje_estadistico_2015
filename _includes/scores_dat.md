@@ -9,4 +9,5 @@ Drei|0.926|2015-11-22 08:38:00
 In God We Trust, all others bring data|0.922|2015-11-24 23:29:00
 Los calabazos|0.921|2015-11-25 23:46:00
 Simple random forest - corrected|0.76|2015-11-19 02:14:00
-alejandromejia|0.719|2015-11-26 05:55:00
+alejandromejia|0.738|2015-11-27 19:07:00
+Machines|0.498|2015-11-27 18:55:00
