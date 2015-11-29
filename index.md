@@ -5,13 +5,12 @@ layout: default
 {% include about.md %}
 - - - 
 
-### Scores públicos de concurso de movimiento
+### Scores finales de concurso de movimiento
 
 Estos scores sólo cuentan las entregas del 18 de noviembre o después. 
 
 {% include scores_dat.md %}
 
-(Actualizados ~1 vez al día)
 
 - - -
 
