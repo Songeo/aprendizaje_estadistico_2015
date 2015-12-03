@@ -1,0 +1,7 @@
+---
+layout: post
+title:  'Clase 28: mejora de modelos, discusión de concurso'
+categories: clase
+---
+
+[Material](https://fg-clases.squarespace.com/aprendizaje-maquina-2013/). Ver clase 10. Aquí también hay material adicional.
